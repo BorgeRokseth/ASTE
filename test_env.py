@@ -1,4 +1,5 @@
 
+from os import environ
 from typing import NamedTuple
 import numpy as np
 
@@ -55,6 +56,7 @@ class TargetShipMaker:
 
 if __name__ == "__main__":
     time_step = 0.5
+    own_ship_route_name = "own_ship_route.txt"
 
     main_engine_capacity = 2160e3
     diesel_gen_capacity = 510e3
@@ -130,12 +132,40 @@ if __name__ == "__main__":
         simulation_time=3600,
     )
 
+    initial_states_own_ship = SimulationConfiguration(
+        initial_north_position_m=100,
+        initial_east_position_m=0,
+        initial_yaw_angle_rad=0 * np.pi / 180,
+        initial_forward_speed_m_per_s=7,
+        initial_sideways_speed_m_per_s=0,
+        initial_yaw_rate_rad_per_s=0,
+        integration_step=time_step,
+        simulation_time=3600,
+    )
+
 
     ship_factory = TargetShipMaker(ship_configuration=ship_config, environment=env_config, machinery_config=machinery_config, sea_lane="ship_in_transit_simulator/examples/route.txt")
     first_target_ship = ship_factory.make_target_ship(start_time=100, initial_states=initial_states_first_ship)
     second_target_ship = ship_factory.make_target_ship(start_time=400, initial_states=initial_states_second_ship)
     list_of_target_ships = [first_target_ship, second_target_ship]
 
+    own_ship = ShipModelSimplifiedPropulsion(
+        ship_config=ship_config,
+        machinery_config=machinery_config,
+        environment_config=env_config,
+        simulation_config=initial_states_own_ship
+    )
 
-    for target_ship in list_of_target_ships:
-        print(target_ship.speed_controller)
+    speed_controller = ThrottleFromSpeedSetPointSimplifiedPropulsion(kp=3, ki=0.02, time_step=initial_states_own_ship.integration_step)
+    own_ship_heading_controller_gains = HeadingControllerGains(kp=4, kd=90, ki=0.01)
+    own_ship_los_guidance_parameters = LosParameters(
+        radius_of_acceptance=600,
+        lookahead_distance=500,
+        integral_gain=0.002,
+        integrator_windup_limit=4000
+    )
+    own_ship_navigation_system = HeadingByRouteController(route_name=own_ship_route_name, heading_controller_gains=own_ship_heading_controller_gains, 
+        los_parameters=own_ship_los_guidance_parameters, time_step=initial_states_own_ship.integration_step, max_rudder_angle=machinery_config.max_rudder_angle_degrees * np.pi/180)
+
+
+
