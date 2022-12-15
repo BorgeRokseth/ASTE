@@ -1,0 +1,9 @@
+.pytest_cache/
+venv/
+.idea/
+__pycache__
+data/hazards/
+data/paths/
+data/shapefiles/
+data/vessels.csv
+ship_in_transit_simulator/
