@@ -61,7 +61,7 @@ if __name__ == "__main__":
     size = 19000, 19000
     center = 182602, 7098749
     files = ['Trondelag.gdb']
-    enc = seacharts.ENC(files=files, border=True, center=center,size=size, new_data=False)
+    enc = seacharts.ENC(files=files, border=True, center=center,size=size, new_data=True)
 
 
     time_step = 0.5
