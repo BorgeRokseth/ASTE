@@ -184,7 +184,6 @@ if __name__ == "__main__":
     # Lists for storing ships and trails
     ship_snap_shots = []
 
-
     # List for storing crashes
     crashes=[]
 
