@@ -58,8 +58,8 @@ class TargetShipMaker:
 
 if __name__ == "__main__":
 
-    size = 19000, 19000
-    center = 182602, 7098749
+    size = 19000, 15000
+    center = 253536, 7045845 # east, north UTM-zone 33
     files = ['Trondelag.gdb']
     enc = seacharts.ENC(files=files, border=True, center=center,size=size, new_data=False)
 
@@ -123,10 +123,10 @@ if __name__ == "__main__":
     )
 
     initial_states_first_ship = SimulationConfiguration(
-        initial_north_position_m=0,
-        initial_east_position_m=0,
+        initial_north_position_m=7039562.36,
+        initial_east_position_m=251040.06,
         initial_yaw_angle_rad=45 * np.pi / 180,
-        initial_forward_speed_m_per_s=7,
+        initial_forward_speed_m_per_s=10,
         initial_sideways_speed_m_per_s=0,
         initial_yaw_rate_rad_per_s=0,
         integration_step=time_step,
@@ -134,8 +134,8 @@ if __name__ == "__main__":
     )
 
     initial_states_second_ship = SimulationConfiguration(
-        initial_north_position_m=10,
-        initial_east_position_m=0,
+        initial_north_position_m=7039562.36,
+        initial_east_position_m=251040.06,
         initial_yaw_angle_rad=45 * np.pi / 180,
         initial_forward_speed_m_per_s=7,
         initial_sideways_speed_m_per_s=0,
@@ -145,9 +145,9 @@ if __name__ == "__main__":
     )
 
     initial_states_own_ship = SimulationConfiguration(
-        initial_north_position_m=7104389.06,
-        initial_east_position_m=190165.4,
-        initial_yaw_angle_rad=-130*np.pi/180,
+        initial_north_position_m=7049516.37,
+        initial_east_position_m=247549.28,
+        initial_yaw_angle_rad=100*np.pi/180,
         initial_forward_speed_m_per_s=7,
         initial_sideways_speed_m_per_s=0,
         initial_yaw_rate_rad_per_s=0,
@@ -157,8 +157,8 @@ if __name__ == "__main__":
 
 
     ship_factory = TargetShipMaker(ship_configuration=ship_config, environment=env_config, machinery_config=machinery_config, sea_lane="sea_lane_route.txt")
-    first_target_ship = ship_factory.make_target_ship(start_time=100, initial_states=initial_states_first_ship)
-    second_target_ship = ship_factory.make_target_ship(start_time=400, initial_states=initial_states_second_ship)
+    first_target_ship = ship_factory.make_target_ship(start_time=0, initial_states=initial_states_first_ship)
+    second_target_ship = ship_factory.make_target_ship(start_time=200, initial_states=initial_states_second_ship)
     list_of_target_ships = [first_target_ship, second_target_ship]
 
     own_ship = ShipModelSimplifiedPropulsion(
@@ -183,7 +183,12 @@ if __name__ == "__main__":
     snap_shot_id = 0
     # Lists for storing ships and trails
     ship_snap_shots = []
-    
+
+
+    # List for storing crashes
+    crashes=[]
+
+
     while own_ship.int.time <= own_ship.int.sim_time:
         global_time = own_ship.int.time
 
@@ -235,15 +240,37 @@ if __name__ == "__main__":
                     target_ship.ship_model.store_simulation_data(throttle)
                     target_ship.ship_model.update_differentials(engine_throttle=throttle, rudder_angle=rudder_angle)
                     target_ship.ship_model.integrate_differentials()
-        
+
+
+            # Add targetships snapshot to chart
+            if time_since_snapshot > time_between_snapshots:
+                snap_shot_id += 1
+                ship_snap_shots.append((snap_shot_id, int(target_ship.ship_model.east), int(target_ship.ship_model.north),
+                                        int(target_ship.ship_model.yaw_angle * 180 / np.pi), "red"))
+                time_since_snapshot = 0
+            time_since_snapshot += own_ship.int.dt
+
+
+        # Add position of crash, values set to x-y< instead of x=y to get some crashes
+        if (own_ship_north_position-target_ship.ship_model.north<2450) and (own_ship_east_position-target_ship.ship_model.east<2450):
+            crashes.append((int(own_ship_north_position), int(own_ship_east_position)))
+
+
         own_ship.int.next_time()
+
+
+    # insert circles at crash-site
+    for i in range(len(crashes)):
+        enc.draw_circle(crashes[i], 100, 'orange',  edge_style='-', thickness=3, fill=True)
+
+
 
     enc.add_vessels(*ship_snap_shots)
     enc.add_hazards(depth=5)
 
     enc.show_display()
 
-
+print(crashes)
 
 
 
