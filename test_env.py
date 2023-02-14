@@ -5,10 +5,12 @@ import numpy as np
 
 import seacharts
 
-from ship_in_transit_simulator.models import EngineThrottleFromSpeedSetPoint, EnvironmentConfiguration, HeadingByRouteController, HeadingControllerGains, LosParameters, ShipConfiguration, ShipModelSimplifiedPropulsion, \
-SimplifiedPropulsionMachinerySystemConfiguration, SimulationConfiguration, SpecificFuelConsumptionBaudouin6M26Dot3, \
+from ship_in_transit_simulator.models import EngineThrottleFromSpeedSetPoint, EnvironmentConfiguration, HeadingByRouteController, HeadingControllerGains,\
+    LosParameters, ShipConfiguration, ShipModelSimplifiedPropulsion, \
+    SimplifiedPropulsionMachinerySystemConfiguration, SimulationConfiguration, SpecificFuelConsumptionBaudouin6M26Dot3, \
     SpecificFuelConsumptionWartila6L26, MachineryModeParams, MachineryMode, MachineryModes, ThrottleControllerGains, ThrottleFromSpeedSetPointSimplifiedPropulsion
 
+from Ane_alterations.Boarder_solution import MapBoarderRegulator
 
 class TargetShip(NamedTuple):
     sim_time: float
@@ -61,11 +63,11 @@ if __name__ == "__main__":
     size = 19000, 15000
     center = 253536, 7045845 # east, north UTM-zone 33
     files = ['Trondelag.gdb']
-    enc = seacharts.ENC(files=files, border=True, center=center,size=size, new_data=True)
+    enc = seacharts.ENC(files=files, border=True, center=center,size=size, new_data=False)
 
 
     time_step = 0.5
-    own_ship_route_name = "own_ship_route.txt"
+    own_ship_route_name = "own_ship_route.txt"      # Redundant, could be added directly into function on line 180
     time_between_snapshots = 60
 
     main_engine_capacity = 2160e3
@@ -144,10 +146,12 @@ if __name__ == "__main__":
         simulation_time=3600,
     )
 
+    own_ship_start = MapBoarderRegulator(size=size, center=center, route="sea_lane_route.txt")
+
     initial_states_own_ship = SimulationConfiguration(
-        initial_north_position_m=7049516.37,
-        initial_east_position_m=247549.28,
-        initial_yaw_angle_rad=100*np.pi/180,
+        initial_north_position_m=own_ship_start.start_north,             # Input boarder modul here
+        initial_east_position_m=own_ship_start.start_east,
+        initial_yaw_angle_rad=100*np.pi/180,             # TODO: Make function such that angle corresponds with route
         initial_forward_speed_m_per_s=7,
         initial_sideways_speed_m_per_s=0,
         initial_yaw_rate_rad_per_s=0,
@@ -267,6 +271,8 @@ if __name__ == "__main__":
     enc.add_vessels(*ship_snap_shots)
     enc.add_hazards(depth=5)
 
+    #enc.save_image("Uten99")
+    #enc.fullscreen_mode(True)
     enc.show_display()
 
 print(crashes)
