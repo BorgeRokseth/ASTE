@@ -146,11 +146,11 @@ if __name__ == "__main__":
         simulation_time=3600,
     )
 
-    own_ship_start = MapBoarderRegulator(size=size, center=center, route="sea_lane_route.txt")
+
 
     initial_states_own_ship = SimulationConfiguration(
-        initial_north_position_m=own_ship_start.start_north,             # Input boarder modul here
-        initial_east_position_m=own_ship_start.start_east,
+        initial_north_position_m=7049516.37,
+        initial_east_position_m=247549.28,
         initial_yaw_angle_rad=100*np.pi/180,             # TODO: Make function such that angle corresponds with route
         initial_forward_speed_m_per_s=7,
         initial_sideways_speed_m_per_s=0,
@@ -273,9 +273,9 @@ if __name__ == "__main__":
 
     #enc.save_image("Uten99")
     #enc.fullscreen_mode(True)
-    enc.show_display()
+    #enc.show_display()
 
-print(crashes)
+#print(crashes)
 
 
 

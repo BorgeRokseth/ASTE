@@ -1,46 +1,43 @@
-''' Classes for Improvements upon existing framework, 2023->'''
+# Classes for Improvements upon existing framework, 2023->
 
 import numpy as np
-import math
-import matplotlib.pyplot as plt
-from collections import defaultdict
-from typing import NamedTuple, List, Union
 
-class MapBoarderRegulator:      #Class with set up for Stopping simulation/plotting outside of map
 
-    # Defines map boarders, route and start points
-    def __init__(self, size, center, route):
+class MapBoarderRegulator:
+    ''' Class with set up for Stopping simulation/plotting outside of map '''
+
+    def __init__(self, shipping_lane, center, size):
+        ''' Defines map boarders, and sets route and empty start points '''
         self.north_side = center[1] + size[1]
         self.south_side = center[1] - size[1]
         self.east_side = center[0] + size[0]
         self.west_side = center[0] - size[0]
-        self.start_north = start_north
-        self.start_east = start_east
-        self.route = route
+        #self.start_north = None
+        #self.start_east = None
+        self.route = shipping_lane
 
 
-    # From models.py
-    def load_waypoints(self, route):
-        '''
-        Reads the file containing the route and stores it as an
-        array of north positions and an array of east positions
-        '''
-        self.data = np.loadtxt(route)
+
+    def load_waypoints(self): # From models.py, changed so route not redundant
+        ''' Reads the file containing the route and stores it as an
+        array of north positions and an array of east positions '''
+        self.data = np.loadtxt(self.route)
         self.north = []
         self.east = []
         for i in range(0, (int(np.size(self.data) / 2))):
             self.north.append(self.data[i][0])
             self.east.append(self.data[i][1])
 
+
     # Finds start point simulation
     def search_waypoints(self):
+        ''' Searches through route points and finds if they are contained in the map. If not, finds intersection with map boarder and sets this as start point'''
 
         # First route point in map
         if self.north_side >= self.north[0] <= self.south_side and self.east_side >= self.east[0] <= self.west_side:
-            start_north = self.north[0]
-            start_east = self.east[0]
-            return start_north, start_east
-
+            self.start_north = self.north[0]
+            self.start_east = self.east[0]
+            print(self.start_east, self.start_north)
         # First route point not in map
         else:
             point_pair_north = []
@@ -52,9 +49,9 @@ class MapBoarderRegulator:      #Class with set up for Stopping simulation/plott
                 and self.north[i+1] in range(self.south_side, self.north_side) and self.east[i+1] in range(self.west_side, self.east_side):
                     point_pair_north.extend([self.north[i], self.north[i+1]])
                     point_pair_east.extend([self.east[i], self.east[i+1]])
-                    return
 
-            # x and y coordinates
+
+            # x and y coordinates for calculation of line coefficients
             x = [point_pair_east[0], point_pair_east[1]]
             y = [point_pair_north[0], point_pair_north[1]]
 
@@ -96,7 +93,9 @@ class MapBoarderRegulator:      #Class with set up for Stopping simulation/plott
                     least_distance = distance
             for i in range(len(dist)):
                 if dist[i] == least_distance:
-                    start_north = possible_start_points[i+1]
-                    start_east = possible_start_points[i]
-                    return start_north, start_east
+                    self.start_north = possible_start_points[i+1]
+                    self.start_east = possible_start_points[i]
+            print(self.start_north, self.start_east)
 
+test=MapBoarderRegulator(shipping_lane='own_ship_route.txt', center=[253536, 7045845], size=[19000, 15000])
+print(test.search_waypoints())
