@@ -44,7 +44,7 @@ class MapBoarderRegulator:
         if self.north[0] <= self.north_side and self.north[0] >= self.south_side and self.east[0]<= self.east_side and self.east[0] >= self.west_side:
             self.start_north = self.north[0]
             self.start_east = self.east[0]
-            print(self.start_north, self.start_east)
+            #print(self.start_north, self.start_east)
         # First route point not in map
         else:
             point_pair_north = []
@@ -101,8 +101,8 @@ class MapBoarderRegulator:
                 if dist[i] == least_distance:
                     self.start_north = possible_start_points[i]
                     self.start_east = possible_start_points[i+1]
-            print(self.start_north, self.start_east)
+            #print(self.start_north, self.start_east)
 
-test=MapBoarderRegulator(shipping_lane='test_route.txt', center=[253536, 7045845], size=[19000, 15000])
+#test=MapBoarderRegulator(shipping_lane='test_route.txt', center=[253536, 7045845], size=[19000, 15000])
 #test.load_waypoints()
-test.search_waypoints()
+#test.search_waypoints()

@@ -146,12 +146,9 @@ if __name__ == "__main__":
         simulation_time=3600,
     )
 
-    test_en = MapBoarderRegulator(shipping_lane='test_route.txt', center=center, size=size)
-    test_en.search_waypoints()
-    print(test_en.start_north, test_en.start_east)
     initial_states_own_ship = SimulationConfiguration(
-        initial_north_position_m=test_en.start_north,#7049516.37,
-        initial_east_position_m=test_en.start_east,#247549.28,
+        initial_north_position_m=7049516.37,
+        initial_east_position_m=247549.28,
         initial_yaw_angle_rad=100*np.pi/180,             # TODO: Make function such that angle corresponds with route
         initial_forward_speed_m_per_s=7,
         initial_sideways_speed_m_per_s=0,
@@ -274,7 +271,7 @@ if __name__ == "__main__":
 
     #enc.save_image("Uten99")
     #enc.fullscreen_mode(True)
-    enc.show_display()
+    #enc.show_display()
 
 #print(crashes)
 
