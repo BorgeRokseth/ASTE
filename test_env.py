@@ -67,7 +67,7 @@ if __name__ == "__main__":
 
 
     time_step = 0.5
-    own_ship_route_name = "own_ship_route.txt"      # Redundant, could be added directly into function on line 180
+    #own_ship_route_name = "own_ship_route.txt"      # Redundant, could be added directly into function on line 180
     time_between_snapshots = 60
 
     main_engine_capacity = 2160e3
@@ -146,11 +146,12 @@ if __name__ == "__main__":
         simulation_time=3600,
     )
 
-
-
+    test_en = MapBoarderRegulator(shipping_lane='test_route.txt', center=center, size=size)
+    test_en.search_waypoints()
+    print(test_en.start_north, test_en.start_east)
     initial_states_own_ship = SimulationConfiguration(
-        initial_north_position_m=7049516.37,
-        initial_east_position_m=247549.28,
+        initial_north_position_m=test_en.start_north,#7049516.37,
+        initial_east_position_m=test_en.start_east,#247549.28,
         initial_yaw_angle_rad=100*np.pi/180,             # TODO: Make function such that angle corresponds with route
         initial_forward_speed_m_per_s=7,
         initial_sideways_speed_m_per_s=0,
@@ -180,7 +181,7 @@ if __name__ == "__main__":
         integral_gain=0.002,
         integrator_windup_limit=4000
     )
-    own_ship_navigation_system = HeadingByRouteController(route_name=own_ship_route_name, heading_controller_gains=own_ship_heading_controller_gains, 
+    own_ship_navigation_system = HeadingByRouteController(route_name='test_route.txt', heading_controller_gains=own_ship_heading_controller_gains,  # TODO Make map regulator produce new txt file so start position is not overriden here
         los_parameters=own_ship_los_guidance_parameters, time_step=initial_states_own_ship.integration_step, max_rudder_angle=machinery_config.max_rudder_angle_degrees * np.pi/180)
 
     time_since_snapshot = time_between_snapshots
@@ -273,7 +274,7 @@ if __name__ == "__main__":
 
     #enc.save_image("Uten99")
     #enc.fullscreen_mode(True)
-    #enc.show_display()
+    enc.show_display()
 
 #print(crashes)
 
