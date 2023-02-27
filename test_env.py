@@ -60,14 +60,14 @@ class TargetShipMaker:
 
 if __name__ == "__main__":
 
-    size = 19000, 15000
+    size = 19000, 19000
     center = 253536, 7045845 # east, north UTM-zone 33
     files = ['Trondelag.gdb']
     enc = seacharts.ENC(files=files, border=True, center=center,size=size, new_data=False)
 
 
     time_step = 0.5
-    #own_ship_route_name = "own_ship_route.txt"      # Redundant, could be added directly into function on line 180
+    #own_ship_route_name = "test_route.txt"      # Redundant, could be added directly into function on line 180
     time_between_snapshots = 60
 
     main_engine_capacity = 2160e3
@@ -146,22 +146,36 @@ if __name__ == "__main__":
         simulation_time=3600,
     )
 
+    ship_factory = TargetShipMaker(ship_configuration=ship_config,
+        environment=env_config,
+        machinery_config=machinery_config,
+        sea_lane="sea_lane_route.txt"
+    )
+    first_target_ship = ship_factory.make_target_ship(start_time=0, initial_states=initial_states_first_ship)
+    second_target_ship = ship_factory.make_target_ship(start_time=200, initial_states=initial_states_second_ship)
+    list_of_target_ships = [first_target_ship, second_target_ship]
+
+
+    test_own = MapBoarderRegulator(
+        shipping_lane='own_ship_route.txt',
+        center=center,
+        size=size
+    )
+    test_own.search_waypoints()
+    test_own.update_txt_file()
+
+
     initial_states_own_ship = SimulationConfiguration(
-        initial_north_position_m=7049516.37,
-        initial_east_position_m=247549.28,
-        initial_yaw_angle_rad=100*np.pi/180,             # TODO: Make function such that angle corresponds with route
+        initial_north_position_m=test_own.start_north,
+        initial_east_position_m=test_own.start_east,
+        initial_yaw_angle_rad=test_own.angle, #140*np.pi/180,
         initial_forward_speed_m_per_s=7,
         initial_sideways_speed_m_per_s=0,
         initial_yaw_rate_rad_per_s=0,
         integration_step=time_step,
-        simulation_time=3600,
+        simulation_time=7000,
     )
-
-
-    ship_factory = TargetShipMaker(ship_configuration=ship_config, environment=env_config, machinery_config=machinery_config, sea_lane="sea_lane_route.txt")
-    first_target_ship = ship_factory.make_target_ship(start_time=0, initial_states=initial_states_first_ship)
-    second_target_ship = ship_factory.make_target_ship(start_time=200, initial_states=initial_states_second_ship)
-    list_of_target_ships = [first_target_ship, second_target_ship]
+    print(test_own.angle)
 
     own_ship = ShipModelSimplifiedPropulsion(
         ship_config=ship_config,
@@ -170,16 +184,29 @@ if __name__ == "__main__":
         simulation_config=initial_states_own_ship
     )
 
-    own_ship_speed_controller = ThrottleFromSpeedSetPointSimplifiedPropulsion(kp=3, ki=0.02, time_step=initial_states_own_ship.integration_step)
-    own_ship_heading_controller_gains = HeadingControllerGains(kp=4, kd=90, ki=0.01)
+    own_ship_speed_controller = ThrottleFromSpeedSetPointSimplifiedPropulsion(
+        kp=3,
+        ki=0.02,
+        time_step=initial_states_own_ship.integration_step
+    )
+    own_ship_heading_controller_gains = HeadingControllerGains(
+        kp=4,
+        kd=90,
+        ki=0.01
+    )
     own_ship_los_guidance_parameters = LosParameters(
         radius_of_acceptance=600,
         lookahead_distance=500,
         integral_gain=0.002,
         integrator_windup_limit=4000
     )
-    own_ship_navigation_system = HeadingByRouteController(route_name='test_route.txt', heading_controller_gains=own_ship_heading_controller_gains,  # TODO Make map regulator produce new txt file so start position is not overriden here
-        los_parameters=own_ship_los_guidance_parameters, time_step=initial_states_own_ship.integration_step, max_rudder_angle=machinery_config.max_rudder_angle_degrees * np.pi/180)
+    own_ship_navigation_system = HeadingByRouteController(
+        route_name='updated_own_ship_route.txt',
+        heading_controller_gains=own_ship_heading_controller_gains,
+        los_parameters=own_ship_los_guidance_parameters,
+        time_step=initial_states_own_ship.integration_step,
+        max_rudder_angle=machinery_config.max_rudder_angle_degrees * np.pi/180
+    )
 
     time_since_snapshot = time_between_snapshots
     snap_shot_id = 0
@@ -187,7 +214,7 @@ if __name__ == "__main__":
     ship_snap_shots = []
 
     # List for storing crashes
-    crashes=[]
+    #crashes=[]
 
 
     while own_ship.int.time <= own_ship.int.sim_time:
@@ -252,28 +279,19 @@ if __name__ == "__main__":
             time_since_snapshot += own_ship.int.dt
 
 
-        # Add position of crash, values set to x-y< instead of x=y to get some crashes
-        if (own_ship_north_position-target_ship.ship_model.north<2450) and (own_ship_east_position-target_ship.ship_model.east<2450):
-            crashes.append((int(own_ship_north_position), int(own_ship_east_position)))
-
-
         own_ship.int.next_time()
 
-
-    # insert circles at crash-site
-    for i in range(len(crashes)):
-        enc.draw_circle(crashes[i], 100, 'orange',  edge_style='-', thickness=3, fill=True)
 
 
 
     enc.add_vessels(*ship_snap_shots)
     enc.add_hazards(depth=5)
 
-    #enc.save_image("Uten99")
+    #enc.save_image("Test_own_ship_route_1")
     #enc.fullscreen_mode(True)
-    #enc.show_display()
+    enc.show_display()
 
-#print(crashes)
+
 
 
 
