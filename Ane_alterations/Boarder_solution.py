@@ -9,10 +9,10 @@ class MapBoarderRegulator:
 
     def __init__(self, shipping_lane, center, size):
         ''' Defines map boarders, and sets route and empty start points '''
-        self.north_side = center[1] + size[1]
-        self.south_side = center[1] - size[1]
-        self.east_side = center[0] + size[0]
-        self.west_side = center[0] - size[0]
+        self.north_side = center[1] + size[1]/2
+        self.south_side = center[1] - size[1]/2
+        self.east_side = center[0] + size[0]/2
+        self.west_side = center[0] - size[0]/2
         self.route = shipping_lane
 
 
