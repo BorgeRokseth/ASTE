@@ -132,7 +132,7 @@ if __name__ == "__main__":
         initial_sideways_speed_m_per_s=0,
         initial_yaw_rate_rad_per_s=0,
         integration_step=time_step,
-        simulation_time=3600,
+        simulation_time=10000,
     )
 
     initial_states_second_ship = SimulationConfiguration(
@@ -143,7 +143,7 @@ if __name__ == "__main__":
         initial_sideways_speed_m_per_s=0,
         initial_yaw_rate_rad_per_s=0,
         integration_step=time_step,
-        simulation_time=3600,
+        simulation_time=10000,
     )
 
     ship_factory = TargetShipMaker(ship_configuration=ship_config,
@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
 
     test_own = MapBoarderRegulator(
-        shipping_lane='own_ship_route.txt',
+        shipping_lane='own_ship_path_ane.txt',
         center=center,
         size=size
     )
@@ -168,12 +168,12 @@ if __name__ == "__main__":
     initial_states_own_ship = SimulationConfiguration(
         initial_north_position_m=test_own.start_north,
         initial_east_position_m=test_own.start_east,
-        initial_yaw_angle_rad=test_own.angle, #140*np.pi/180,
+        initial_yaw_angle_rad=test_own.angle, # in rads, formula: degrees*np.pi/180
         initial_forward_speed_m_per_s=7,
         initial_sideways_speed_m_per_s=0,
         initial_yaw_rate_rad_per_s=0,
         integration_step=time_step,
-        simulation_time=7000,
+        simulation_time=10000,
     )
     print(test_own.angle)
 
@@ -201,7 +201,7 @@ if __name__ == "__main__":
         integrator_windup_limit=4000
     )
     own_ship_navigation_system = HeadingByRouteController(
-        route_name='updated_own_ship_route.txt',
+        route_name='updated_own_ship_path_ane.txt',
         heading_controller_gains=own_ship_heading_controller_gains,
         los_parameters=own_ship_los_guidance_parameters,
         time_step=initial_states_own_ship.integration_step,
@@ -225,6 +225,11 @@ if __name__ == "__main__":
         own_ship_east_position = own_ship.east
         own_ship_heading = own_ship.yaw_angle
         own_ship_speed = own_ship.forward_speed
+
+        # Check if own ship goes out of map and simulation should end
+        if own_ship_north_position > test_own.north_side or own_ship_north_position < test_own.south_side \
+        or own_ship_east_position > test_own.east_side or own_ship_east_position < test_own.west_side:
+            own_ship.int.time = own_ship.int.sim_time + 1
 
         # Find appropriate rudder angle and engine throttle
         rudder_angle = own_ship_navigation_system.rudder_angle_from_route(
@@ -264,6 +269,12 @@ if __name__ == "__main__":
                         speed_set_point=5,
                         measured_speed=target_ship.ship_model.forward_speed,
                     )
+
+                    # Check if target ship goes outside map and should be terminated
+                    if target_ship.ship_model.north > test_own.north_side or target_ship.ship_model.north < test_own.south_side \
+                    or target_ship.ship_model.east > test_own.east_side or target_ship.ship_model.east < test_own.west_side:
+                        list_of_target_ships.remove(target_ship)
+
                     # Update and integrate differential equations for current time step
                     target_ship.ship_model.store_simulation_data(throttle)
                     target_ship.ship_model.update_differentials(engine_throttle=throttle, rudder_angle=rudder_angle)

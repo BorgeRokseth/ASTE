@@ -83,7 +83,7 @@ class MapBoarderRegulator:
             for i in range(len(self.north) - 1):
                 self.counter += 1
                 #print(i)
-                if (self.north[i] >= self.north_side or self.north[i] <= self.south_side or self.east[i] >= self.east_side or self.east[i] <= self.west_side) \
+                if (self.north[i] > self.north_side or self.north[i] < self.south_side or self.east[i] > self.east_side or self.east[i] < self.west_side) \
                 and self.north_side >= self.north[i + 1] >= self.south_side and self.east_side >= self.east[i + 1] >= self.west_side:
                     point_pair_north.extend([self.north[i], self.north[i + 1]])
                     point_pair_east.extend([self.east[i], self.east[i + 1]])
