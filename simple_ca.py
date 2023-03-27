@@ -20,7 +20,7 @@ from ship_in_transit_simulator.models import ShipModel, ShipConfiguration, Envir
     EngineThrottleFromSpeedSetPoint, ThrottleControllerGains, SpecificFuelConsumptionWartila6L26, \
     SpecificFuelConsumptionBaudouin6M26Dot3, StaticObstacle
 
-from Ane_alterations.Collision_avoidance import InitialStates, StaticValues, UpdatedVariables
+from Ane_alterations.Collision_avoidance import InitialStates, StaticValues, UpdatedVariables, Controllers
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -37,10 +37,10 @@ time_step = 0.5
 
 ship_config = ShipConfiguration(
     coefficient_of_deadweight_to_displacement=0.7,
-    bunkers=200000,
-    ballast=200000,
-    length_of_ship=80,
-    width_of_ship=16,
+    bunkers=20000,
+    ballast=20000,
+    length_of_ship=20,
+    width_of_ship=8,
     added_mass_coefficient_in_surge=0.4,
     added_mass_coefficient_in_sway=0.4,
     added_mass_coefficient_in_yaw=0.4,
@@ -114,7 +114,7 @@ simulation_setup = SimulationConfiguration(
     initial_sideways_speed_m_per_s=0,
     initial_yaw_rate_rad_per_s=0,
     integration_step=time_step,
-    simulation_time=300
+    simulation_time=250
 )
 
 fuel_curves_me = SpecificFuelConsumptionWartila6L26()
@@ -131,7 +131,7 @@ desired_forward_speed_meters_per_second = 8.5
 time_since_last_ship_drawing = 30
 
 # Control system setup
-heading_controller_gains = HeadingControllerGains(kp=4, kd=90, ki=0.01)
+heading_controller_gains = HeadingControllerGains(kp=5, kd=90, ki=0.01)
 heading_controller = HeadingByReferenceController(
     gains=heading_controller_gains, time_step=time_step,
     max_rudder_angle=machinery_config.max_rudder_angle_degrees * np.pi/180
@@ -147,50 +147,65 @@ throttle_controller = EngineThrottleFromSpeedSetPoint(
 )
 
 # Obstacle
-rock = StaticObstacle(n_pos=1000, e_pos=800, radius=10)
+rock = StaticObstacle(n_pos=700, e_pos=560, radius=10)
 
 # Collision avoidance parameters and object
 initial_ca = InitialStates(init_desired_yaw_angle__psi_des=desired_heading_radians,
                            init_desired_surge_velocity__u_des=desired_forward_speed_meters_per_second)
 
-static_values_ca = StaticValues(safe_radius__r0=100,
-                                switch_radius__rm=200,
+static_values_ca = StaticValues(safe_radius__r0=200,
+                                switch_radius__rm=300,
                                 head_on_angle__alpha=15*np.pi/180,
                                 look_ahead_distance__delta=100,
                                 mass_matrix__m=ship_model.mass_matrix(),
                                 dampening_matrix__d=ship_model.linear_damping_matrix(),
                                 time_step=time_step,
-                                max_rudder_angle=ship_model.ship_machinery_model.rudder_ang_max,
+                                max_rudder_angle= ship_model.ship_machinery_model.rudder_ang_max*np.pi/180,
                                 max_shaft_speed=ship_model.ship_machinery_model.shaft_speed_max,
-                                surge_velocity_obstacle__u0=0)
+                                surge_velocity_obstacle__u0=0,
+                                collision_avoidance_speed=5)
 
-dynamic_values_ca = UpdatedVariables(north__y=ship_model.north,
-                                     east__x=ship_model.east,
-                                     yaw_angle__psi=ship_model.yaw_angle,
-                                     surge_speed__u=ship_model.forward_speed,
-                                     sway_speed__v=ship_model.sideways_speed,
-                                     yaw_rate__r=ship_model.yaw_rate,
-                                     shaft_speed=ship_model.ship_machinery_model.omega,
-                                     north_obstacle__yc=rock.n,
-                                     east_obstacle__xc=rock.e,
-                                     yaw_obstacle__psi_c=45*np.pi/180)
+
 
 ship_with_ca = SetBasedGuidance(initial=initial_ca, static=static_values_ca)
 
-while ship_model.int.time < ship_model.int.sim_time:
-    # "Measure" heading and speed
-    heading_measurement_radians = ship_model.yaw_angle
-    measured_speed_m_per_s = ship_model.forward_speed
-    measured_shaft_speed_rad_per_s = ship_model.ship_machinery_model.omega
+cont_param = Controllers(surge=0, yaw=0)
 
-    # Run collision avoidance
-    ship_with_ca.update_variables(updated=dynamic_values_ca)
+while ship_model.int.time < ship_model.int.sim_time:
+
+    # Update parameters
+    dynamic_values_ca = UpdatedVariables(north__y=ship_model.north,
+                                         east__x=ship_model.east,
+                                         yaw_angle__psi=ship_model.yaw_angle,
+                                         surge_speed__u=ship_model.forward_speed,
+                                         sway_speed__v=ship_model.sideways_speed,
+                                         yaw_rate__r=ship_model.yaw_rate,
+                                         shaft_speed=ship_model.ship_machinery_model.omega,
+                                         north_obstacle__yc=rock.n,
+                                         east_obstacle__xc=rock.e,
+                                         yaw_obstacle__psi_c=45 * np.pi / 180)
+
+    # Run the set based algorithm
+    ship_with_ca.update_variables(updated=dynamic_values_ca, cont=cont_param)
     ship_with_ca.set_based_guidance_algorithm()
 
+    # Find appropriate rudder angle and engine throttle
+    rudder_angle = heading_controller.rudder_angle_from_heading_setpoint(
+        heading_ref=ship_with_ca.psi_des,
+        measured_heading=ship_with_ca.psi
+    )
+    throttle = throttle_controller.throttle(
+        speed_set_point=ship_with_ca.u_des,
+        measured_speed=ship_with_ca.u,
+        measured_shaft_speed=ship_with_ca.shaft_speed
+    )
+
+    # Update controller parameters
+    cont_param = Controllers(surge=throttle, yaw=rudder_angle)
 
     # Update and integrate differential equations for current time step
-    ship_model.store_simulation_data(ship_with_ca.u_des)
-    ship_model.update_differentials(engine_throttle=ship_with_ca.u_des, rudder_angle=ship_with_ca.psi_des)
+    ship_model.store_simulation_data(throttle)
+    ship_model.update_differentials(engine_throttle=throttle, rudder_angle=rudder_angle)
     ship_model.integrate_differentials()
 
     # Make a drawing of the ship from above every 30 second
