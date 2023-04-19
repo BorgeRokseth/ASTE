@@ -3,7 +3,7 @@ import sys
 import os
 from functools import reduce
 sys.path.insert(1, 'ASTE/Ane_alterations/')
-from Ane_alterations.Collision_avoidance import SetBasedGuidance
+from Ane_alterations.Collision_avoidance_stationary_obstacle import SetBasedGuidance
 
 # allow imports when running script from within project dir
 [sys.path.append(i) for i in ['.', '..']]
@@ -20,7 +20,7 @@ from ship_in_transit_simulator.models import ShipModel, ShipConfiguration, Envir
     EngineThrottleFromSpeedSetPoint, ThrottleControllerGains, SpecificFuelConsumptionWartila6L26, \
     SpecificFuelConsumptionBaudouin6M26Dot3, StaticObstacle
 
-from Ane_alterations.Collision_avoidance import InitialStates, StaticValues, UpdatedVariables, Controllers
+from Ane_alterations.Collision_avoidance_stationary_obstacle import InitialStates, StaticValues, UpdatedVariables, Controllers
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -109,7 +109,7 @@ machinery_config = MachinerySystemConfiguration(
 simulation_setup = SimulationConfiguration(
     initial_north_position_m=0,
     initial_east_position_m=0,
-    initial_yaw_angle_rad=10 * np.pi / 180,
+    initial_yaw_angle_rad=45 * np.pi / 180,
     initial_forward_speed_m_per_s=7,
     initial_sideways_speed_m_per_s=0,
     initial_yaw_rate_rad_per_s=0,
@@ -145,9 +145,9 @@ throttle_controller = EngineThrottleFromSpeedSetPoint(
     time_step=time_step,
     initial_shaft_speed_integral_error=114
 )
-
+print(ship_model.ship_machinery_model.shaft_speed_max)
 # Obstacle
-rock = StaticObstacle(n_pos=700, e_pos=560, radius=10)
+rock = StaticObstacle(n_pos=600, e_pos=600, radius=20)
 
 # Collision avoidance parameters and object
 initial_ca = InitialStates(init_desired_yaw_angle__psi_des=desired_heading_radians,
@@ -183,7 +183,7 @@ while ship_model.int.time < ship_model.int.sim_time:
                                          shaft_speed=ship_model.ship_machinery_model.omega,
                                          north_obstacle__yc=rock.n,
                                          east_obstacle__xc=rock.e,
-                                         yaw_obstacle__psi_c=45 * np.pi / 180)
+                                         yaw_obstacle__psi_c=-135 * np.pi / 180)
 
     # Run the set based algorithm
     ship_with_ca.update_variables(updated=dynamic_values_ca, cont=cont_param)
@@ -219,6 +219,9 @@ while ship_model.int.time < ship_model.int.sim_time:
 # Store the simulation results in a pandas dataframe
 results = pd.DataFrame().from_dict(ship_model.simulation_results)
 
+x2 = rock.e + rock.r*math.cos(-135*np.pi/180)
+y2 = rock.n + rock.r*math.sin(-135*np.pi/180)
+
 # Example on how a map-view can be generated
 map_fig, map_ax = plt.subplots()
 rock.plot_obst(ax=map_ax)
@@ -226,6 +229,7 @@ map_ax.plot(results['east position [m]'], results['north position [m]'])
 for x, y in zip(ship_model.ship_drawings[1], ship_model.ship_drawings[0]):
     map_ax.plot(x, y, color='black')
 map_ax.set_aspect('equal')
+plt.plot([rock.e, x2],[rock.n, y2])
 
 # Example on plotting time series
 #speed_fig, (rpm_ax, speed_ax) = plt.subplots(2, 1)

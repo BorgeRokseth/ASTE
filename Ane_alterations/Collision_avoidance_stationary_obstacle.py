@@ -12,10 +12,10 @@ import numpy as np
 
 
 
-class PathFollowingParameters(NamedTuple):
+class InitialStates(NamedTuple):
     '''Desired initial velocity and heading'''
-    path_desired_yaw_angle__psi_des: float
-    path_desired_surge_velocity__u_des: float
+    init_desired_yaw_angle__psi_des: float
+    init_desired_surge_velocity__u_des: float
 
 
 
@@ -29,6 +29,8 @@ class StaticValues(NamedTuple):
     dampening_matrix__d: np.ndarray
     time_step: float
     max_rudder_angle: float
+    max_shaft_speed: float
+    surge_velocity_obstacle__u0: float
     collision_avoidance_speed: float
 
 
@@ -41,10 +43,10 @@ class UpdatedVariables(NamedTuple):
     surge_speed__u: float
     sway_speed__v: float
     yaw_rate__r: float
+    shaft_speed: float
     north_obstacle__yc: float
     east_obstacle__xc: float
     yaw_obstacle__psi_c: float
-    surge_velocity_obstacle__u0: float
 
 
 
@@ -58,7 +60,7 @@ class SetBasedGuidance:
     '''Set based guidance algorithm that chooses between path following and obstacle avoidance.
        Currently adjusted to accommodate stationary obstacles'''
 
-    def __init__(self,path: PathFollowingParameters, static: StaticValues):
+    def __init__(self,initial: InitialStates, static: StaticValues):
         # Initialization for set based method
         self.path_following = 'path following'
         self.object_avoidance = 'object avoidance'
@@ -68,25 +70,25 @@ class SetBasedGuidance:
         self.r0 = static.safe_radius__r0
         self.rm = static.switch_radius__rm
         self.alpha = static.head_on_angle__alpha
+        self.u0 = static.surge_velocity_obstacle__u0   # math.sqrt(self.xc_dot**2 + self.yc_dot**2)
         self.u_des_oa = static.collision_avoidance_speed
 
         # Necessary values for controllers
         self.time_step = static.time_step
         self.max_rudder_angle = static.max_rudder_angle
+        self.max_shaft_speed = static.max_shaft_speed
 
         # Matrices
         self.m = static.mass_matrix__m
         self.d = static.dampening_matrix__d
 
         # Desired velocity and heading
-        self.psi_des = path.path_desired_yaw_angle__psi_des
-        self.u_des = path.path_desired_surge_velocity__u_des
+        self.psi_des = initial.init_desired_yaw_angle__psi_des
+        self.u_des = initial.init_desired_surge_velocity__u_des
 
-        # Path following velocity and heading = desired
-        self.path_psi = path.path_desired_yaw_angle__psi_des
-        self.path_u = path.path_desired_surge_velocity__u_des
-
-
+        # Static values for path following
+        self.init_u_des = initial.init_desired_surge_velocity__u_des
+        self.init_psi_des = initial.init_desired_yaw_angle__psi_des
 
 
 
@@ -134,10 +136,10 @@ class SetBasedGuidance:
         self.u = updated.surge_speed__u
         self.v = updated.sway_speed__v
         self.r = updated.yaw_rate__r
+        self.shaft_speed = updated.shaft_speed
         self.yc = updated.north_obstacle__yc
         self.xc = updated.east_obstacle__xc
         self.psi_c = updated.yaw_obstacle__psi_c
-        self.u0 = updated.surge_velocity_obstacle__u0
 
         # Controllers
         self.tau_u = cont.surge
@@ -169,8 +171,8 @@ class SetBasedGuidance:
 
         # Calculation variables
         self.phi = math.atan2((self.y - self.yc),(self.x - self.xc)) #- np.pi/2
-        self.vita_0 = math.atan2(self.yc_dot,self.xc_dot)
-        self.v0 = self.u0 * math.cos(self.phi - self.vita_0) # Zero when object is stationary
+        self.vita_0 = 0  # set as zero for stationary object: math.atan2(self.yc_dot,self.xc_dot)
+        self.v0 = self.u0 * math.cos(self.psi - self.vita_0) # Zero when object is stationary
 
         self.rho = math.sqrt((self.x - self.xc) ** 2 + (self.y - self.yc) ** 2)
         self.sigma = self.rho
@@ -182,32 +184,27 @@ class SetBasedGuidance:
         self.omega = self.psi_c - self.phi # self.psi_c needs to be converted if it comes from angle of ship in simulator
         self.omega = self.angle_correction(self.omega)
 
+
         self.e = self.r0 - self.rho
-
-
+        # self.a = math.sqrt(self.u_des_oa**2 + self.v**2) - self.v0**2
+        # self.b = -2*self.v0**2*self.e
+        # self.c = -self.v0**2*(self.delta**2 + self.e**2)
+        # if self.v0 >= 0:
+        #     self.k = (-self.b + math.sqrt(self.b**2 - 4*self.a*self.c))/2*self.a
+        # elif self.v0 < 0:
+        #     self.k = (-self.b - math.sqrt(self.b**2 - 4*self.a*self.c))/2*self.a
+        self.k = 0  # set to zero for stationary object
 
 
 
 
     def obstacle_avoidance_algorithm(self, lambda_d):
-        # Parameter for compensation of obstacle movement
-        self.a = math.sqrt(self.u_des_oa ** 2 + self.v ** 2) - self.v0**2
-        self.b = -2 * self.v0 ** 2 * self.e
-        self.c = -self.v0 ** 2 * (self.delta ** 2 + self.e ** 2)
-        if (self.b**2 - 4*self.a*self.c) < 0:
-            self.k = 0
-        else:
-            if self.v0 >= 0:
-                self.k = (-self.b + math.sqrt(self.b ** 2 - 4 * self.a * self.c)) / 2 * self.a
-            elif self.v0 < 0:
-                self.k = (-self.b - math.sqrt(self.b ** 2 - 4 * self.a * self.c)) / 2 * self.a
-
-        print(self.k)
         correction1 = math.atan((self.e + self.k)/self.delta)
         correction2 = math.atan(self.v / self.u_des_oa)
 
         self.psi_oa = self.phi + lambda_d * ((math.pi/2) - correction1) - correction2
         self.psi_oa = self.atan2_to_sim(self.psi_oa)
+        print(self.psi_oa, self.phi, correction1, correction2)
         return self.psi_oa
 
 
@@ -234,7 +231,7 @@ class SetBasedGuidance:
 
         psi_oa_c = self.obstacle_avoidance_algorithm(lambda_d=1)
         psi_oa_cc = self.obstacle_avoidance_algorithm(lambda_d=-1)
-        # print(self.psi, self.psi_oa, psi_oa_cc, psi_oa_c, 'this')
+        print(self.psi, self.psi_oa, psi_oa_cc, psi_oa_c, 'this')
 
         # Overtaking
         if self.omega < -112.5*np.pi/180 or self.omega > 112.5*np.pi/180:
@@ -247,17 +244,17 @@ class SetBasedGuidance:
 
         # Crossing from left
         elif self.alpha <= self.omega < 112.5*np.pi/180:
-            self.lambda_d = 1
+            self.lambda_d = -1
             return self.lambda_d
 
         # Crossing from right
         elif -112.5*np.pi/180 <= self.omega < self.alpha:
-            self.lambda_d = 1
+            self.lambda_d = -1
             return self.lambda_d
 
         # Head on
         elif -self.alpha <= self.omega < self.alpha:
-            self.lambda_d = 1
+            self.lambda_d = -1
             return self.lambda_d
 
 
@@ -268,8 +265,8 @@ class SetBasedGuidance:
             a = self.tangent_cone()
             if a:
                 mode = self.path_following
-                self.u_des = self.path_u
-                self.psi_des = self.path_psi
+                self.u_des = self.init_u_des
+                self.psi_des = self.init_psi_des
             else:
                 if self.last_mode == self.path_following:
                     self.lambda_direction()
@@ -278,9 +275,7 @@ class SetBasedGuidance:
                 mode = self.object_avoidance
                 self.psi_des = self.obstacle_avoidance_algorithm(lambda_d=self.lambda_d)
                 self.u_des = self.u_des_oa
-
             self.last_mode = mode
-            # print(self.u_des, self.psi_des)
             return self.u_des, self.psi_des
 
 
