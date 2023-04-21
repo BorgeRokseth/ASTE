@@ -181,8 +181,10 @@ class SetBasedGuidance:
 
         self.omega = self.psi_c - self.phi # self.psi_c needs to be converted if it comes from angle of ship in simulator
         self.omega = self.angle_correction(self.omega)
+        # print(self.psi_c, self.phi, self.omega)
 
         self.e = self.r0 - self.rho
+
 
 
 
@@ -202,7 +204,8 @@ class SetBasedGuidance:
             elif self.v0 < 0:
                 self.k = (-self.b - math.sqrt(self.b ** 2 - 4 * self.a * self.c)) / 2 * self.a
 
-        print(self.k)
+
+
         correction1 = math.atan((self.e + self.k)/self.delta)
         correction2 = math.atan(self.v / self.u_des_oa)
 

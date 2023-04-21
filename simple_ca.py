@@ -147,7 +147,7 @@ throttle_controller = EngineThrottleFromSpeedSetPoint(
 )
 print(ship_model.ship_machinery_model.shaft_speed_max)
 # Obstacle
-rock = StaticObstacle(n_pos=600, e_pos=600, radius=20)
+rock = StaticObstacle(n_pos=600, e_pos=550, radius=20)
 
 # Collision avoidance parameters and object
 initial_ca = InitialStates(init_desired_yaw_angle__psi_des=desired_heading_radians,
