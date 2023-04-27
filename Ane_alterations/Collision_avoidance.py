@@ -35,14 +35,14 @@ class StaticValues(NamedTuple):
 
 class UpdatedVariables(NamedTuple):
     '''Variables take from existing ship and obstacle that needs to be continuously updated'''
-    north__y: float
-    east__x: float
+    north__x: float
+    east__y: float
     yaw_angle__psi: float
     surge_speed__u: float
     sway_speed__v: float
     yaw_rate__r: float
-    north_obstacle__yc: float
-    east_obstacle__xc: float
+    north_obstacle__xc: float
+    east_obstacle__yc: float
     yaw_obstacle__psi_c: float
     surge_velocity_obstacle__u0: float
 
@@ -123,21 +123,38 @@ class SetBasedGuidance:
 
         return angle
 
+    def sim_to_car(self, angle):
+        '''Converts angles from the simulator to angles according to the Cartesian plane'''
+        angle = angle*(-1) + (np.pi/2)
+
+        # If angles is over a full circle
+        angle = angle % (2 * np.pi)
+
+        # If angle is over half a circle (simulator does not handle this well)
+        if angle > np.pi:
+            angle = - (2 * np.pi - angle)
+
+        elif angle < -np.pi:
+            angle = 2 * np.pi + angle
+
+        return angle
+
 
 
     def update_variables(self, updated: UpdatedVariables, cont: Controllers):
 
         # Updated states
-        self.y = updated.north__y
-        self.x = updated.east__x
-        self.psi = updated.yaw_angle__psi
+        self.north_x = updated.north__x
+        self.east_y = updated.east__y
+        self.psi =updated.yaw_angle__psi
         self.u = updated.surge_speed__u
         self.v = updated.sway_speed__v
         self.r = updated.yaw_rate__r
-        self.yc = updated.north_obstacle__yc
-        self.xc = updated.east_obstacle__xc
-        self.psi_c = updated.yaw_obstacle__psi_c
+        self.north_xc = updated.north_obstacle__xc
+        self.east_yc = updated.east_obstacle__yc
+        self.psi_c =updated.yaw_obstacle__psi_c
         self.u0 = updated.surge_velocity_obstacle__u0
+
 
         # Controllers
         self.tau_u = cont.surge
@@ -156,36 +173,38 @@ class SetBasedGuidance:
                   ((self.d[1][1] * self.m[2][2] - self.d[2][1] * self.m[1][2]) / under)
 
         # Derived own ship states
-        self.x_dot = math.sin(self.psi) * self.u + math.cos(self.psi) * self.v
-        self.y_dot = math.cos(self.psi) * self.u - math.sin(self.psi) * self.v
+        self.east_y_dot = math.sin(self.psi) * self.u + math.cos(self.psi) * self.v
+        self.north_x_dot = math.cos(self.psi) * self.u - math.sin(self.psi) * self.v
         self.psi_dot = self.r
         self.u_dot = self.fu_vt - (self.d[0][0] / self.m[0][0]) * self.u + self.tau_u
         self.v_dot = self.xu * self.r + self.yu * self.v
         self.r_dot = self.f_uvr + self.tau_r
 
+
         # Derived obstacle states
-        self.yc_dot = self.u0 * math.cos(self.psi_c)  # Y component of obstacle surge speed, zero for static obstacle
-        self.xc_dot = self.u0 * math.sin(self.psi_c)  # X component of obstacle surge speed, zero for static obstacle
+        self.east_yc_dot = self.u0 * math.cos(self.psi_c)  # Y component of obstacle surge speed, zero for static obstacle
+        self.north_xc_dot = self.u0 * math.sin(self.psi_c)  # X component of obstacle surge speed, zero for static obstacle
+
 
         # Calculation variables
-        self.phi = math.atan2((self.y - self.yc),(self.x - self.xc)) #- np.pi/2
-        self.vita_0 = math.atan2(self.yc_dot,self.xc_dot)
+        self.phi = math.atan2((self.east_y - self.east_yc),(self.north_x - self.north_xc))
+        self.vita_0 = self.atan2_to_sim(math.atan2(self.east_yc_dot,self.north_xc_dot))
         self.v0 = self.u0 * math.cos(self.phi - self.vita_0) # Zero when object is stationary
 
-        self.rho = math.sqrt((self.x - self.xc) ** 2 + (self.y - self.yc) ** 2)
+
+
+        self.rho = math.sqrt((self.north_x - self.north_xc) ** 2 + (self.east_y - self.east_yc) ** 2)
         self.sigma = self.rho
         self.sigma_min = min(self.rm, max(self.sigma, self.r0))
         self.sigma_max = math.inf
-        self.sigma_dot = (2 * (self.x - self.xc) * (self.x_dot - self.xc_dot) + 2 * (self.y - self.yc) * (self.y_dot - self.yc_dot)) / \
-                         (2 * math.sqrt((self.x - self.xc) ** 2 + (self.y - self.yc) ** 2))
+        self.sigma_dot = (2 * (self.north_x - self.north_xc) * (self.north_x_dot - self.north_xc_dot)\
+                         + 2 * (self.east_y - self.east_yc) * (self.east_y_dot - self.east_yc_dot)) / \
+                         (2 * math.sqrt((self.north_x - self.north_xc) ** 2 + (self.east_y - self.east_yc) ** 2))
 
         self.omega = self.psi_c - self.phi # self.psi_c needs to be converted if it comes from angle of ship in simulator
         self.omega = self.angle_correction(self.omega)
-        # print(self.psi_c, self.phi, self.omega)
 
         self.e = self.r0 - self.rho
-
-
 
 
 
@@ -196,21 +215,24 @@ class SetBasedGuidance:
         self.a = math.sqrt(self.u_des_oa ** 2 + self.v ** 2) - self.v0**2
         self.b = -2 * self.v0 ** 2 * self.e
         self.c = -self.v0 ** 2 * (self.delta ** 2 + self.e ** 2)
-        if (self.b**2 - 4*self.a*self.c) < 0:
+
+        if self.b**2 - 4*self.a*self.c < 0:
             self.k = 0
         else:
             if self.v0 >= 0:
-                self.k = (-self.b + math.sqrt(self.b ** 2 - 4 * self.a * self.c)) / 2 * self.a
+                self.k = (-self.b + math.sqrt(abs(self.b ** 2 - 4 * self.a * self.c))) / 2 * self.a
             elif self.v0 < 0:
-                self.k = (-self.b - math.sqrt(self.b ** 2 - 4 * self.a * self.c)) / 2 * self.a
+                self.k = (-self.b - math.sqrt(abs(self.b ** 2 - 4 * self.a * self.c))) / 2 * self.a
 
-
+        # print(self.k, self.v0, self.c)
 
         correction1 = math.atan((self.e + self.k)/self.delta)
         correction2 = math.atan(self.v / self.u_des_oa)
 
         self.psi_oa = self.phi + lambda_d * ((math.pi/2) - correction1) - correction2
-        self.psi_oa = self.atan2_to_sim(self.psi_oa)
+        self.psi_oa = self.angle_correction(self.psi_oa)
+        # self.psi_oa = self.atan2_to_sim(self.psi_oa)
+        print(self.psi_oa, self.phi, correction1, correction2)
         return self.psi_oa
 
 
@@ -250,17 +272,17 @@ class SetBasedGuidance:
 
         # Crossing from left
         elif self.alpha <= self.omega < 112.5*np.pi/180:
-            self.lambda_d = 1
+            self.lambda_d = -1
             return self.lambda_d
 
         # Crossing from right
         elif -112.5*np.pi/180 <= self.omega < self.alpha:
-            self.lambda_d = 1
+            self.lambda_d = -1
             return self.lambda_d
 
         # Head on
         elif -self.alpha <= self.omega < self.alpha:
-            self.lambda_d = 1
+            self.lambda_d = -1
             return self.lambda_d
 
 

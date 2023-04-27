@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
     time_step = 0.5
     # own_ship_route_name = "test_route.txt"      # Redundant, could be added directly into function on line 180
-    time_between_snapshots = 60
+    time_between_snapshots = 30
 
     main_engine_capacity = 2160e3
     diesel_gen_capacity = 510e3
@@ -192,9 +192,9 @@ if __name__ == "__main__":
     test_own.update_txt_file()
 
     initial_states_own_ship = SimulationConfiguration(
-        initial_north_position_m=7048337.46 ,#test_own.start_north,
-        initial_east_position_m=248431.66, #test_own.start_east,
-        initial_yaw_angle_rad=90*np.pi/180,#test_own.angle,  # in rads, formula: degrees*np.pi/180
+        initial_north_position_m=7048136.48 ,#test_own.start_north,
+        initial_east_position_m=261421.6, #test_own.start_east,
+        initial_yaw_angle_rad=-90*np.pi/180,#test_own.angle,  # in rads, formula: degrees*np.pi/180
         initial_forward_speed_m_per_s=7,
         initial_sideways_speed_m_per_s=0,
         initial_yaw_rate_rad_per_s=0,
@@ -226,7 +226,7 @@ if __name__ == "__main__":
         integrator_windup_limit=4000
     )
     own_ship_navigation_system = HeadingByRouteController(
-        route_name='test_route.txt',
+        route_name='try_route.txt',
         heading_controller_gains=own_ship_heading_controller_gains,
         los_parameters=own_ship_los_guidance_parameters,
         time_step=initial_states_own_ship.integration_step,
@@ -327,7 +327,7 @@ if __name__ == "__main__":
     static_values_ca = StaticValues(safe_radius__r0=300,
                                     switch_radius__rm=500,
                                     head_on_angle__alpha=15 * np.pi / 180,
-                                    look_ahead_distance__delta=200,
+                                    look_ahead_distance__delta=600,
                                     mass_matrix__m=third_target_ship.ship_model.mass_matrix(),
                                     dampening_matrix__d=third_target_ship.ship_model.linear_damping_matrix(),
                                     time_step=time_step,
@@ -347,7 +347,7 @@ if __name__ == "__main__":
     own_static_values_ca = StaticValues(safe_radius__r0=300,
                                     switch_radius__rm=500,
                                     head_on_angle__alpha=15 * np.pi / 180,
-                                    look_ahead_distance__delta=200,
+                                    look_ahead_distance__delta=600,
                                     mass_matrix__m=own_ship.mass_matrix(),
                                     dampening_matrix__d=own_ship.linear_damping_matrix(),
                                     time_step=time_step,
@@ -376,48 +376,47 @@ if __name__ == "__main__":
             own_ship.int.time = own_ship.int.sim_time + 1
 
         # Update variables
-        own_dynamic_values_ca = UpdatedVariables(north__y=own_ship.north,
-                                             east__x=own_ship.east,
-                                             yaw_angle__psi=own_ship.yaw_angle,
-                                             surge_speed__u=own_ship.forward_speed,
-                                             sway_speed__v=own_ship.sideways_speed,
-                                             yaw_rate__r=own_ship.yaw_rate,
-                                             north_obstacle__yc=third_target_ship.ship_model.north,
-                                             east_obstacle__xc=third_target_ship.ship_model.east,
-                                             yaw_obstacle__psi_c=third_target_ship.ship_model.yaw_angle,
-                                             surge_velocity_obstacle__u0=third_target_ship.ship_model.forward_speed)
+        # own_dynamic_values_ca = UpdatedVariables(north__x=own_ship.north,
+        #                                      east__y=own_ship.east,
+        #                                      yaw_angle__psi=own_ship.yaw_angle,
+        #                                      surge_speed__u=own_ship.forward_speed,
+        #                                      sway_speed__v=own_ship.sideways_speed,
+        #                                      yaw_rate__r=own_ship.yaw_rate,
+        #                                      north_obstacle__xc=third_target_ship.ship_model.north,
+        #                                      east_obstacle__yc=third_target_ship.ship_model.east,
+        #                                      yaw_obstacle__psi_c=third_target_ship.ship_model.yaw_angle,
+        #                                      surge_velocity_obstacle__u0=third_target_ship.ship_model.forward_speed)
+        #
+        # # Run the set based algorithm
+        # own_ship_with_ca.update_variables(updated=own_dynamic_values_ca, cont=cont_params)
+        # own_ship_with_ca.set_based_guidance_algorithm()
+        #
+        #
+        # # Update parameters
+        # if own_ship_with_ca.last_mode == own_ship_with_ca.path_following:
+        # Find appropriate rudder angle and engine throttle (assume perfect measurements)
+        rudder_angle = own_ship_navigation_system.rudder_angle_from_route(
+            north_position=own_ship.north,
+            east_position=own_ship.east,
+            heading=own_ship.yaw_angle
+        )
+        throttle = own_ship_speed_controller.throttle(
+            speed_set_point=desired_speed_own_ship,
+            measured_speed=own_ship.forward_speed,
+        )
 
-        # Run the set based algorithm
-        own_ship_with_ca.update_variables(updated=own_dynamic_values_ca, cont=cont_params)
-        own_ship_with_ca.set_based_guidance_algorithm()
-
-        # Update parameters
-        if own_ship_with_ca.last_mode == own_ship_with_ca.path_following:
-            # Find appropriate rudder angle and engine throttle (assume perfect measurements)
-            rudder_angle = own_ship_navigation_system.rudder_angle_from_route(
-                north_position=own_ship.north,
-                east_position=own_ship.east,
-                heading=own_ship.yaw_angle
-            )
-            throttle = own_ship_speed_controller.throttle(
-                speed_set_point=desired_speed_own_ship,
-                measured_speed=own_ship.forward_speed,
-            )
-            #print(f'rudder_angle={rudder_angle} for pathfinding')
-
-        elif own_ship_with_ca.last_mode == own_ship_with_ca.object_avoidance:
-            rudder_angle = heading_controller.rudder_angle_from_heading_setpoint(
-                heading_ref=own_ship_with_ca.psi_des,
-                measured_heading=own_ship.yaw_angle
-            )
-            throttle = own_ship_speed_controller.throttle(
-                speed_set_point=desired_speed_own_ship,
-                measured_speed=own_ship.forward_speed,
-            )
-            # print(f'rudder_angle={rudder_angle} for object avoidance')
-
-        # Update controller parameters
-        cont_param = Controllers(surge=throttle, yaw=rudder_angle)
+        # elif own_ship_with_ca.last_mode == own_ship_with_ca.object_avoidance:
+        #     rudder_angle = heading_controller.rudder_angle_from_heading_setpoint(
+        #         heading_ref=own_ship_with_ca.psi_des,
+        #         measured_heading=own_ship.yaw_angle
+        #     )
+        #     throttle = own_ship_speed_controller.throttle(
+        #         speed_set_point=desired_speed_own_ship,
+        #         measured_speed=own_ship.forward_speed,
+        #     )
+        #
+        # # Update controller parameters
+        # cont_param = Controllers(surge=throttle, yaw=rudder_angle)
 
         # Update and integrate differential equations for current time step
         own_ship.store_simulation_data(throttle)
@@ -440,14 +439,14 @@ if __name__ == "__main__":
 
                     # Update parameters
                     if target_ship == third_target_ship:
-                        dynamic_values_ca = UpdatedVariables(north__y=third_target_ship.ship_model.north,
-                                                             east__x=third_target_ship.ship_model.east,
+                        dynamic_values_ca = UpdatedVariables(north__x=third_target_ship.ship_model.north,
+                                                             east__y=third_target_ship.ship_model.east,
                                                              yaw_angle__psi=third_target_ship.ship_model.yaw_angle,
                                                              surge_speed__u=third_target_ship.ship_model.forward_speed,
                                                              sway_speed__v=third_target_ship.ship_model.sideways_speed,
                                                              yaw_rate__r=third_target_ship.ship_model.yaw_rate,
-                                                             north_obstacle__yc=own_ship.north,
-                                                             east_obstacle__xc=own_ship.east,
+                                                             north_obstacle__xc=own_ship.north,
+                                                             east_obstacle__yc=own_ship.east,
                                                              yaw_obstacle__psi_c=own_ship.yaw_angle,
                                                              surge_velocity_obstacle__u0=own_ship.forward_speed)
 
@@ -523,7 +522,7 @@ if __name__ == "__main__":
 
         own_ship.int.next_time()
 
-    # Reordering distance array collision index
+    #Reordering distance array collision index
     # dist_ships = np.column_stack((dist_ships))
 
     # Reordering distance array grounding index
