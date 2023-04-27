@@ -33,14 +33,14 @@ class StaticValues(NamedTuple):
 
 class UpdatedVariables(NamedTuple):
     '''Variables take from existing ship and obstacle that needs to be continuously updated'''
-    north__y: float
-    east__x: float
+    north__x: float
+    east__y: float
     yaw_angle__psi: float
     surge_speed__u: float
     sway_speed__v: float
     yaw_rate__r: float
-    north_obstacle__yc: float
-    east_obstacle__xc: float
+    north_obstacle__xc: float
+    east_obstacle__yc: float
     yaw_obstacle__psi_c: float
     surge_velocity_obstacle__u0: float
 
@@ -105,8 +105,9 @@ class SetBasedGuidance:
 
 
     def atan2_to_sim(self, angle):
-        '''Converts angle you get from math.atan2 (+-pi from horizontal axis right side) to coordinate system according
-        to ShipSimplifiedPropulsion (relative to north axis with positive clockwise). Corrects angles over pi'''
+        '''Converts angles between the simulator frame (relative to north axis and positive in clockewise direction)
+           and Cartesian frame (relative to positive x-axis and positive in counter-clockwise direction).
+           Also corrects angles to [-pi,pi]'''
         angle = angle * (-1) + (np.pi / 2)
 
         # If angles is over a full circle
@@ -126,15 +127,15 @@ class SetBasedGuidance:
     def update_variables(self, updated: UpdatedVariables, cont: Controllers):
 
         # Updated states
-        self.y = updated.north__y
-        self.x = updated.east__x
-        self.psi = updated.yaw_angle__psi
+        self.north_x = updated.north__x
+        self.east_y = updated.east__y
+        self.psi = self.atan2_to_sim(updated.yaw_angle__psi)
         self.u = updated.surge_speed__u
         self.v = updated.sway_speed__v
         self.r = updated.yaw_rate__r
-        self.yc = updated.north_obstacle__yc
-        self.xc = updated.east_obstacle__xc
-        self.psi_c = updated.yaw_obstacle__psi_c
+        self.north_xc = updated.north_obstacle__xc
+        self.east_yc = updated.east_obstacle__yc
+        self.psi_c = self.atan2_to_sim(updated.yaw_obstacle__psi_c)
         self.u0 = updated.surge_velocity_obstacle__u0
 
         # Controllers
@@ -154,28 +155,29 @@ class SetBasedGuidance:
                   ((self.d[1][1] * self.m[2][2] - self.d[2][1] * self.m[1][2]) / under)
 
         # Derived own ship states
-        self.x_dot = math.sin(self.psi) * self.u + math.cos(self.psi) * self.v
-        self.y_dot = math.cos(self.psi) * self.u - math.sin(self.psi) * self.v
+        self.north_x_dot = math.sin(self.psi) * self.u + math.cos(self.psi) * self.v
+        self.east_y_dot = math.cos(self.psi) * self.u - math.sin(self.psi) * self.v
         self.psi_dot = self.r
         self.u_dot = self.fu_vt - (self.d[0][0] / self.m[0][0]) * self.u + self.tau_u
         self.v_dot = self.xu * self.r + self.yu * self.v
         self.r_dot = self.f_uvr + self.tau_r
 
         # Derived obstacle states
-        self.yc_dot = self.u0 * math.cos(self.psi_c)  # Y component of obstacle surge speed, zero for static obstacle
-        self.xc_dot = self.u0 * math.sin(self.psi_c)  # X component of obstacle surge speed, zero for static obstacle
+        self.east_yc_dot = self.u0 * math.cos(self.psi_c)  # Y component of obstacle surge speed, zero for static obstacle
+        self.north_xc_dot = self.u0 * math.sin(self.psi_c)  # X component of obstacle surge speed, zero for static obstacle
 
         # Calculation variables
-        self.phi = math.atan2((self.y - self.yc),(self.x - self.xc)) #- np.pi/2
-        self.vita_0 = math.atan2(self.yc_dot,self.xc_dot)
+        self.phi = self.atan2_to_sim(math.atan2((self.east_y - self.east_yc),(self.north_x - self.north_xc))) #- np.pi/2
+        self.vita_0 = math.atan2(self.east_yc_dot,self.north_xc_dot)
         self.v0 = self.u0 * math.cos(self.phi - self.vita_0) # Zero when object is stationary
 
-        self.rho = math.sqrt((self.x - self.xc) ** 2 + (self.y - self.yc) ** 2)
+        self.rho = math.sqrt((self.north_x - self.north_xc) ** 2 + (self.east_y - self.east_yc) ** 2)
         self.sigma = self.rho
         self.sigma_min = min(self.rm, max(self.sigma, self.r0))
         self.sigma_max = math.inf
-        self.sigma_dot = (2 * (self.x - self.xc) * (self.x_dot - self.xc_dot) + 2 * (self.y - self.yc) * (self.y_dot - self.yc_dot)) / \
-                         (2 * math.sqrt((self.x - self.xc) ** 2 + (self.y - self.yc) ** 2))
+        self.sigma_dot = (2 * (self.north_x - self.north_xc) * (self.north_x_dot - self.north_xc_dot)\
+                          + 2 * (self.east_y - self.east_yc) * (self.east_y_dot - self.east_yc_dot)) / \
+                         (2 * math.sqrt((self.north_x - self.north_xc) ** 2 + (self.east_y - self.east_yc) ** 2))
 
         self.omega = self.psi_c - self.phi # self.psi_c needs to be converted if it comes from angle of ship in simulator
         self.omega = self.angle_correction(self.omega)
