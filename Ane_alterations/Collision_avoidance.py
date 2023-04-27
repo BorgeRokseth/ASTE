@@ -45,6 +45,7 @@ class UpdatedVariables(NamedTuple):
     east_obstacle__yc: float
     yaw_obstacle__psi_c: float
     surge_velocity_obstacle__u0: float
+    sway_velocity_obstacle__v0: float
 
 
 
@@ -154,6 +155,7 @@ class SetBasedGuidance:
         self.east_yc = updated.east_obstacle__yc
         self.psi_c =updated.yaw_obstacle__psi_c
         self.u0 = updated.surge_velocity_obstacle__u0
+        self.sway_v0 = updated.sway_velocity_obstacle__v0
 
 
         # Controllers
@@ -182,13 +184,13 @@ class SetBasedGuidance:
 
 
         # Derived obstacle states
-        self.east_yc_dot = self.u0 * math.cos(self.psi_c)  # Y component of obstacle surge speed, zero for static obstacle
-        self.north_xc_dot = self.u0 * math.sin(self.psi_c)  # X component of obstacle surge speed, zero for static obstacle
+        self.east_yc_dot = math.sin(self.psi_c) * self.u0 + math.cos(self.psi_c) * self.sway_v0  # Y component of obstacle surge speed, zero for static obstacle
+        self.north_xc_dot = math.cos(self.psi_c) * self.u0 - math.sin(self.psi_c) * self.sway_v0  # X component of obstacle surge speed, zero for static obstacle
 
 
         # Calculation variables
         self.phi = math.atan2((self.east_y - self.east_yc),(self.north_x - self.north_xc))
-        self.vita_0 = self.atan2_to_sim(math.atan2(self.east_yc_dot,self.north_xc_dot))
+        self.vita_0 = math.atan2(self.east_yc_dot,self.north_xc_dot)
         self.v0 = self.u0 * math.cos(self.phi - self.vita_0) # Zero when object is stationary
 
 
@@ -220,11 +222,11 @@ class SetBasedGuidance:
             self.k = 0
         else:
             if self.v0 >= 0:
-                self.k = (-self.b + math.sqrt(abs(self.b ** 2 - 4 * self.a * self.c))) / 2 * self.a
+                self.k = (-self.b + math.sqrt(self.b ** 2 - 4 * self.a * self.c)) / 2 * self.a
             elif self.v0 < 0:
-                self.k = (-self.b - math.sqrt(abs(self.b ** 2 - 4 * self.a * self.c))) / 2 * self.a
+                self.k = (-self.b - math.sqrt(self.b ** 2 - 4 * self.a * self.c)) / 2 * self.a
 
-        # print(self.k, self.v0, self.c)
+        print(self.k)
 
         correction1 = math.atan((self.e + self.k)/self.delta)
         correction2 = math.atan(self.v / self.u_des_oa)
@@ -232,7 +234,7 @@ class SetBasedGuidance:
         self.psi_oa = self.phi + lambda_d * ((math.pi/2) - correction1) - correction2
         self.psi_oa = self.angle_correction(self.psi_oa)
         # self.psi_oa = self.atan2_to_sim(self.psi_oa)
-        print(self.psi_oa, self.phi, correction1, correction2)
+
         return self.psi_oa
 
 
