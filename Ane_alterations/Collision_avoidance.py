@@ -1,8 +1,6 @@
 '''Collision avoidance from Set-based Line-of-sight (LOS) path following with collision avoidance
    for underactuated unmanned surface vessel, Moe & Pettersen (2016)
-
    Uses a set-based control approach for switching between path following mode and collision avoidance mode.
-
    Any modes can be used in combination with this, here the ship_in_transit_simulator has the path following mode and
    the collision avoidance mode is the one suggested in the article.
 '''
@@ -285,7 +283,6 @@ class SetBasedGuidance:
             self.last_mode = mode
             # print(self.u_des, self.psi_des)
             return self.u_des, self.psi_des
-
 
 
 
