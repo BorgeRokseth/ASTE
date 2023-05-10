@@ -1,5 +1,7 @@
 import math
 from typing import NamedTuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import shapely.geometry as geo
@@ -76,7 +78,7 @@ if __name__ == "__main__":
 
     time_step = 0.5
     # own_ship_route_name = "test_route.txt"      # Redundant, could be added directly into function on line 180
-    time_between_snapshots = 60
+    time_between_snapshots = 30
 
     main_engine_capacity = 2160e3
     diesel_gen_capacity = 510e3
@@ -356,6 +358,13 @@ if __name__ == "__main__":
 
     own_ship_with_ca = SetBasedGuidance(path=own_path_following_parameters, static=own_static_values_ca)
 
+    time_own_ship = []
+    time_target_1 = []
+    time_target_2 = []
+    time_target_3 = []
+
+    xy = []
+
     while own_ship.int.time <= own_ship.int.sim_time:
         global_time = own_ship.int.time
 
@@ -366,8 +375,9 @@ if __name__ == "__main__":
         own_ship_speed = own_ship.forward_speed
 
         # Check for grounding
-        if own_ship.int.time % 400 == 0:
+        if own_ship.int.time % time_between_snapshots == 0:
             grounding_index(dist_ground, own_ship.north, own_ship.east)
+            time_own_ship.append(own_ship.int.time)
 
 
         # Check if own ship goes out of map and simulation should end
@@ -504,18 +514,27 @@ if __name__ == "__main__":
                     target_ship.ship_model.integrate_differentials()
 
             # Collision index
-            if own_ship.int.time % 60 == 0:
+            if own_ship.int.time % time_between_snapshots == 0:
                 collision_index(dist_ships, own_ship.north, own_ship.east, target_ship.ship_model.north, target_ship.ship_model.east)
+                if target_ship == first_target_ship:
+                    time_target_1.append(global_time + target_ship.start_time)
+                elif target_ship == second_target_ship:
+                    time_target_2.append(global_time + target_ship.start_time)
+                elif target_ship == third_target_ship:
+                    time_target_3.append(global_time + target_ship.start_time)
 
-            if target_ship == third_target_ship:
-                # Add targetships snapshot to chart
-                if time_since_snapshot > time_between_snapshots:
-                    snap_shot_id += 1
-                    ship_snap_shots.append(
-                        (snap_shot_id, int(target_ship.ship_model.east), int(target_ship.ship_model.north),
-                         int(target_ship.ship_model.yaw_angle * 180 / np.pi), "red"))
-                    time_since_snapshot = 0
-                time_since_snapshot += own_ship.int.dt
+
+            # if target_ship == third_target_ship:
+            # Add targetships snapshot to chart
+            if time_since_snapshot > time_between_snapshots:
+                snap_shot_id += 1
+                ship_snap_shots.append(
+                    (snap_shot_id, int(target_ship.ship_model.east), int(target_ship.ship_model.north),
+                     int(target_ship.ship_model.yaw_angle * 180 / np.pi), "red"))
+                time_since_snapshot = 0
+            time_since_snapshot += own_ship.int.dt
+
+
 
             index += 1
 
@@ -530,7 +549,7 @@ if __name__ == "__main__":
     # dist_ground = np.vstack(dist_ground)
 
     # print(dist_ships)
-    # print(dist_ground)
+    print(dist_ground)
 
     enc.add_vessels(*ship_snap_shots)
     enc.add_hazards(depth=5)
@@ -540,3 +559,19 @@ if __name__ == "__main__":
     #enc.save_image("Image to show basic collision index")
     #enc.fullscreen_mode(True)
     enc.show_display()
+
+
+    fig, axs = plt.subplots(2)
+    fig.suptitle('Collision and grounding distances')
+    # Plot collision distance
+    axs[0].plot(time_target_1, dist_ships[1], label='target ships 1') # 1 and 2 appear to be swapped in the time
+    axs[0].plot(time_target_2, dist_ships[0], label= 'target ship 2')
+    axs[0].plot(time_target_3, dist_ships[2], label= 'target ship 3')
+    axs[0].set(xlabel='Simulation time', ylabel= 'Distance between own ship and target ship')
+    axs[0].set_title('Collision')
+    # Plot grounding distance
+    axs[1].plot(time_own_ship, dist_ground[0])
+    axs[1].set(xlabel='Simulation time', ylabel='Distance to ground')
+    axs[1].set_title('Grounding')
+    axs.legend()
+    plt.show()

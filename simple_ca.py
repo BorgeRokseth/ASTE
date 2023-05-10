@@ -147,7 +147,7 @@ throttle_controller = EngineThrottleFromSpeedSetPoint(
 )
 print(ship_model.ship_machinery_model.shaft_speed_max)
 # Obstacle
-rock = StaticObstacle(n_pos=600, e_pos=550, radius=20)
+rock = StaticObstacle(n_pos=600, e_pos=650, radius=20)
 
 # Collision avoidance parameters and object
 initial_ca = InitialStates(init_desired_yaw_angle__psi_des=desired_heading_radians,
@@ -183,7 +183,7 @@ while ship_model.int.time < ship_model.int.sim_time:
                                          shaft_speed=ship_model.ship_machinery_model.omega,
                                          north_obstacle__yc=rock.n,
                                          east_obstacle__xc=rock.e,
-                                         yaw_obstacle__psi_c=-135 * np.pi / 180)
+                                         yaw_obstacle__psi_c=45 * np.pi / 180)
 
     # Run the set based algorithm
     ship_with_ca.update_variables(updated=dynamic_values_ca, cont=cont_param)
@@ -219,8 +219,8 @@ while ship_model.int.time < ship_model.int.sim_time:
 # Store the simulation results in a pandas dataframe
 results = pd.DataFrame().from_dict(ship_model.simulation_results)
 
-x2 = rock.e + rock.r*math.cos(-135*np.pi/180)
-y2 = rock.n + rock.r*math.sin(-135*np.pi/180)
+x2 = rock.e + rock.r*math.cos(45*np.pi/180)
+y2 = rock.n + rock.r*math.sin(45*np.pi/180)
 
 # Example on how a map-view can be generated
 map_fig, map_ax = plt.subplots()

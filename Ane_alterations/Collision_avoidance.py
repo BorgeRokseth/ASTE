@@ -281,7 +281,6 @@ class SetBasedGuidance:
                 self.u_des = self.u_des_oa
 
             self.last_mode = mode
-            # print(self.u_des, self.psi_des)
             return self.u_des, self.psi_des
 
 

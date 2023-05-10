@@ -204,7 +204,8 @@ class SetBasedGuidance:
 
         self.psi_oa = self.phi + lambda_d * ((math.pi/2) - correction1) - correction2
         self.psi_oa = self.atan2_to_sim(self.psi_oa)
-        print(self.psi_oa, self.phi, correction1, correction2)
+
+
         return self.psi_oa
 
 
