@@ -65,7 +65,7 @@ class SetBasedGuidance:
         self.path_following = 'path following'
         self.object_avoidance = 'object avoidance'
         self.last_mode = self.path_following
-        self.lambda_d = -1
+        self.lambda_d = 1
         self.delta = static.look_ahead_distance__delta
         self.r0 = static.safe_radius__r0
         self.rm = static.switch_radius__rm
@@ -183,7 +183,7 @@ class SetBasedGuidance:
 
         self.omega = self.psi_c - self.phi # self.psi_c needs to be converted if it comes from angle of ship in simulator
         self.omega = self.angle_correction(self.omega)
-
+        print(self.phi, self.omega)
 
         self.e = self.r0 - self.rho
         # self.a = math.sqrt(self.u_des_oa**2 + self.v**2) - self.v0**2
@@ -204,7 +204,7 @@ class SetBasedGuidance:
 
         self.psi_oa = self.phi + lambda_d * ((math.pi/2) - correction1) - correction2
         self.psi_oa = self.atan2_to_sim(self.psi_oa)
-
+        # self.psi_oa = self.angle_correction(self.psi_oa)
 
         return self.psi_oa
 
@@ -245,17 +245,17 @@ class SetBasedGuidance:
 
         # Crossing from left
         elif self.alpha <= self.omega < 112.5*np.pi/180:
-            self.lambda_d = -1
+            self.lambda_d = 1
             return self.lambda_d
 
         # Crossing from right
         elif -112.5*np.pi/180 <= self.omega < self.alpha:
-            self.lambda_d = -1
+            self.lambda_d = 1
             return self.lambda_d
 
         # Head on
         elif -self.alpha <= self.omega < self.alpha:
-            self.lambda_d = -1
+            self.lambda_d = 1
             return self.lambda_d
 
 
